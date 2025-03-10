@@ -13,17 +13,9 @@ load_dotenv()
 
 
 
-from starlette.staticfiles import StaticFiles
-
-
-
-
-
 app = Flask(__name__)
 app.secret_key = 'resume_enhancer_secret_key'
 app.config['UPLOAD_FOLDER'] = tempfile.mkdtemp()
-
-# app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 def extract_text_from_pdf(pdf_path):
     text = ""
@@ -123,8 +115,6 @@ def enhance_resume(resume_text):
 def write_to_pdf(text):
     
     pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], "enhanced_resume.pdf")
-    
-    # Create document
     doc = SimpleDocTemplate(
         pdf_path,
         pagesize=letter,
@@ -133,12 +123,8 @@ def write_to_pdf(text):
         topMargin=40,
         bottomMargin=40
     )
-    
-    # Create styles
     styles = getSampleStyleSheet()
     normal_style = styles['Normal']
-    
-    # Create a centered style for headings
     centered_style = ParagraphStyle(
         'Centered',
         parent=styles['Normal'],
@@ -147,14 +133,12 @@ def write_to_pdf(text):
         fontSize=14
     )
     
-    # Create a bold style
     bold_style = ParagraphStyle(
         'Bold',
         parent=styles['Normal'],
         fontName='Helvetica-Bold'
     )
     
-    # Process the text to convert markdown-like formatting to HTML
     paragraphs = []
     
     for line in text.split("\n"):
@@ -162,26 +146,19 @@ def write_to_pdf(text):
             paragraphs.append(Paragraph("<br/>", normal_style))
             continue
             
-        # Process bold text: ******text****** to bold
         line = re.sub(r'\*\*\*\*\*\*(.*?)\*\*\*\*\*\*', r'<b>\1</b>', line)
         
-        # Process other bold markers: **text** to bold
         line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', line)
         
-        # Add as paragraph with appropriate style
-        if re.match(r'^<b>.*</b>$', line) and len(line) < 60:  # If the entire line is bold and short, treat as heading
-            # Remove the bold tags for centered headings
+        if re.match(r'^<b>.*</b>$', line) and len(line) < 60: 
             clean_line = re.sub(r'</?b>', '', line)
             paragraphs.append(Paragraph(clean_line, centered_style))
         else:
             paragraphs.append(Paragraph(line, normal_style))
     
-    # Build the document
     doc.build(paragraphs)
     
     print(f"PDF saved at {pdf_path}")
-    
-    # Validate content
     doc = fitz.open(pdf_path)
     print("PDF Content:")
     for page in doc:
@@ -216,13 +193,6 @@ def write_to_docx(text):
 
 
 
-
-
-
-
-
-
-
 @app.route('/')
 def index():
     return render_template('index_flask.html')
@@ -238,12 +208,10 @@ def upload_file():
     
     if file.filename == '':
         return redirect(url_for('index'))
-    
-    # Save the uploaded file
+
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
     file.save(file_path)
     
-    # Extract text from the file
     if file.filename.endswith('.pdf'):
         resume_text = extract_text_from_pdf(file_path)
         original_format = 'pdf'
@@ -256,10 +224,7 @@ def upload_file():
     if not resume_text:
         return "Failed to extract text from the uploaded file."
     
-    # Enhance the resume
     enhancement_result = enhance_resume(resume_text)
-    
-    # Store the enhanced resume and changes in session
     session['improved_resume'] = enhancement_result['improved_resume']
     session['changes_made'] = enhancement_result['changes_made']
     session['output_format'] = output_format
@@ -274,12 +239,9 @@ def show_results():
         return redirect(url_for('index'))
     
     changes_made = session.get('changes_made')
-    
-    # Format changes made as HTML with bullet points
     formatted_changes = ""
     for line in changes_made.split('\n'):
         if line.strip():
-            # Check if line already has a bullet point
             if line.strip().startswith('•') or line.strip().startswith('-') or line.strip().startswith('*'):
                 formatted_changes += f"<li>{line.strip()[1:].strip()}</li>"
             else:
@@ -296,8 +258,7 @@ def download_file():
     
     improved_resume = session.get('improved_resume')
     output_format = session.get('output_format', 'pdf')
-    
-    # Create the enhanced file in the requested format
+
     if output_format == 'docx':
         output_path = write_to_docx(improved_resume)
         mime_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -306,8 +267,6 @@ def download_file():
         output_path = write_to_pdf(improved_resume, )
         mime_type = 'application/pdf'
         filename = "enhanced_resume.pdf"
-    
-    # Check if the file exists and is readable
     if not os.path.exists(output_path) or not os.access(output_path, os.R_OK):
         return "Error: Could not generate the file. Please try again."
     
