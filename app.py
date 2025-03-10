@@ -95,6 +95,8 @@ def enhance_resume(resume_text):
 
 
         improved_resume = improved_resume_match.group(1).strip() if improved_resume_match else "No improvements found."
+        print("Improved Resume:")
+        print(improved_resume)
         changes_made = changes_made_match.group(1).strip() if changes_made_match else "No changes specified."
         
         return {
