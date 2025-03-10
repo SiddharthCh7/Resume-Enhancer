@@ -42,82 +42,73 @@ def extract_text_from_docx(docx_path):
 
 
 def enhance_resume(resume_text):
-    system_prompt = """You are a professional resume enhancement expert. 
-        Your task is to improve the provided resume text while COMPLETELY PRESERVING ALL of the original content and sections.
-
-        What You Should Do:
-        Improve readability, conciseness, and clarity without changing the meaning.
-        Make the writing more polished and professional while keeping it natural.
-        
-        What You Should NOT Do:
-        Don't add anything new—not even for credibility.
-        Don't change the order, structure, or formatting in any way.
-        Don't remove anything, even if it seems unnecessary.
-        Don't rewrite sentences in a way that alters the original intent.
-        Your goal is to make the resume sound crisp, clear, and professional—without changing what's actually being said. Stick to the original content and just refine the language.
-
-
-
-        Format your response with two clearly marked sections:
-        <IMPROVED_RESUME>
-        [The complete improved resume text with EVERY SINGLE element from the original preserved]
-        </IMPROVED_RESUME>
-        
-        <CHANGES_MADE>
-        [Bulleted list of specific language improvements made]
-        </CHANGES_MADE>
-        """
-
-    user_message = f"Here is my resume text to enhance. You MUST keep ALL sections, ALL projects, and ALL technical skills:\n\n{resume_text}"
-
-    payload = {
-        "model": "deepseek/deepseek-r1:free",
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message}
-        ]
-    }
-    headers = {
-    "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}", 
-    "Content-Type": "application/json"
-    }
-    response = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions", 
-        headers=headers, 
-        data=json.dumps(payload)
-    )
-
-# Check if request was successful
-    if response.status_code != 200:
-        return {"error": True, "message": f"API request failed: {response.status_code}, {response.text}"}
-
-    try:
-        result = response.json()
-        if "choices" not in result or not result["choices"]:
-            return {"error": True, "message": "Unexpected API response format"}
-
-        content = result["choices"][0]["message"]["content"]
-
-        improved_resume_match = re.search(r"<IMPROVED_RESUME>\s*(.*?)\s*</IMPROVED_RESUME>", content, re.DOTALL)
-        changes_made_match = re.search(r"<CHANGES_MADE>\s*(.*?)\s*</CHANGES_MADE>", content, re.DOTALL)
-
-        if not improved_resume_match:
-            return {"error": True, "message": "Could not extract improved resume from API response"}
-        print("Improved Resumee")
-        print(improved_resume)
-        improved_resume = improved_resume_match.group(1).strip() if improved_resume_match else "No Improvement Needed"
-        changes_made = changes_made_match.group(1).strip() if changes_made_match else "No changes specified."
-
-        return {
-            "improved_resume": improved_resume,
-            "changes_made": changes_made,
-            "error": False
-        }
-
-    except Exception as e:
-        return {"error": True, "message": f"Error parsing API response: {str(e)}"}
-
-
+     try:
+         system_prompt = """You are a professional resume enhancement expert. 
+             Your task is to improve the provided resume text while COMPLETELY PRESERVING ALL of the original content and sections.
+ 
+             What You Should Do:
+             Improve readability, conciseness, and clarity without changing the meaning.
+             Make the writing more polished and professional while keeping it natural.
+             
+             What You Should NOT Do:
+             Don't add anything new—not even for credibility.
+             Don't change the order, structure, or formatting in any way.
+             Don't remove anything, even if it seems unnecessary.
+             Don't rewrite sentences in a way that alters the original intent.
+             Your goal is to make the resume sound crisp, clear, and professional—without changing what's actually being said. Stick to the original content and just refine the language.
+ 
+ 
+ 
+             Format your response with two clearly marked sections:
+             <IMPROVED_RESUME>
+             [The complete improved resume text with EVERY SINGLE element from the original preserved]
+             </IMPROVED_RESUME>
+             
+             <CHANGES_MADE>
+             [Bulleted list of specific language improvements made]
+             </CHANGES_MADE>
+             """
+ 
+         user_message = f"Here is my resume text to enhance. You MUST keep ALL sections, ALL projects, and ALL technical skills:\n\n{resume_text}"
+     
+         payload = {
+             "model": "deepseek/deepseek-r1:free",
+             "messages": [
+                 {"role": "system", "content": system_prompt},
+                 {"role": "user", "content": user_message}
+             ]
+         }
+         headers = {
+         "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}", 
+         "Content-Type": "application/json"
+         }
+         response = requests.post(
+             "https://openrouter.ai/api/v1/chat/completions", 
+             headers=headers, 
+             data=json.dumps(payload)
+         )
+         
+         result = response.json()["choices"][0]["message"]["content"]
+         
+         improved_resume_match = re.search(r"<IMPROVED_RESUME>\s*(.*?)\s*</IMPROVED_RESUME>", result, re.DOTALL)
+         changes_made_match = re.search(r"<CHANGES_MADE>\s*(.*?)\s*</CHANGES_MADE>", result, re.DOTALL)
+ 
+ 
+         improved_resume = improved_resume_match.group(1).strip() if improved_resume_match else "No improvements found."
+         changes_made = changes_made_match.group(1).strip() if changes_made_match else "No changes specified."
+         
+         return {
+             "improved_resume": improved_resume,
+             "changes_made": changes_made,
+             "error": False
+         }
+         
+     except Exception as e:
+         return {
+             "error": True,
+             "message": f"Error: {str(e)}"
+         }
+ 
 
 
 
@@ -234,7 +225,6 @@ def upload_file():
         return "Failed to extract text from the uploaded file."
     
     enhancement_result = enhance_resume(resume_text)
-    print("ER")
     print(enhancement_result)
     session['improved_resume'] = enhancement_result['improved_resume']
     session['changes_made'] = enhancement_result['changes_made']
