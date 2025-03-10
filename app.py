@@ -15,8 +15,7 @@ load_dotenv()
 
 from starlette.staticfiles import StaticFiles
 
-static_dir = os.path.join(os.getcwd(), "static")  # Ensure valid path
-os.makedirs(static_dir, exist_ok=True)  # Create if missing
+
 
 
 
@@ -24,7 +23,7 @@ app = Flask(__name__)
 app.secret_key = 'resume_enhancer_secret_key'
 app.config['UPLOAD_FOLDER'] = tempfile.mkdtemp()
 
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
+# app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 def extract_text_from_pdf(pdf_path):
     text = ""
