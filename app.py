@@ -103,8 +103,9 @@ def enhance_resume(resume_text):
 
         if not improved_resume_match:
             return {"error": True, "message": "Could not extract improved resume from API response"}
-
-        improved_resume = improved_resume_match.group(1).strip()
+        print("Improved Resumee")
+        print(improved_resume)
+        improved_resume = improved_resume_match.group(1).strip() if improved_resume_match else "No Improvement Needed"
         changes_made = changes_made_match.group(1).strip() if changes_made_match else "No changes specified."
 
         return {
@@ -233,6 +234,8 @@ def upload_file():
         return "Failed to extract text from the uploaded file."
     
     enhancement_result = enhance_resume(resume_text)
+    print("ER")
+    print(enhancement_result)
     session['improved_resume'] = enhancement_result['improved_resume']
     session['changes_made'] = enhancement_result['changes_made']
     session['output_format'] = output_format
