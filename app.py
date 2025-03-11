@@ -14,13 +14,16 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 from dotenv import load_dotenv
 import uvicorn
+from pathlib import Path
 load_dotenv()
 
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key="resume_enhancer_secret_key")
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+
+# Set up templates directory
+templates_directory = Path(__file__).parent / "templates"
+templates = Jinja2Templates(directory=str(templates_directory))
 
 # Create a temporary folder for file uploads
 UPLOAD_FOLDER = tempfile.mkdtemp()
@@ -162,32 +165,17 @@ def write_to_pdf(text):
     
     doc.build(paragraphs)
     
-    print(f"PDF saved at {pdf_path}")
-    doc = fitz.open(pdf_path)
-    print("PDF Content:")
-    for page in doc:
-        print(page.get_text())
-    doc.close()
-    
     return pdf_path
 
 
 def write_to_docx(text):
-    print("well: ")
-    print(text)
+
     docx_path = os.path.join(UPLOAD_FOLDER, "enhanced_resume.docx")
     doc = Document()
     for line in text.split("\n"):
         doc.add_paragraph(line)
 
     doc.save(docx_path)
-    print(f"DOCX saved at {docx_path}\n")
-
-    doc = Document(docx_path)
-    print("HERE IG:")
-    for para in doc.paragraphs:
-        print(para.text)
-
     return docx_path
 
 
@@ -236,7 +224,6 @@ async def show_results(request: Request):
         return RedirectResponse(url="/", status_code=303)
     
     changes_made = request.session.get("changes_made", "")
-    print(changes_made)
     formatted_changes = ""
     for line in changes_made.split('\n'):
         if line.strip():
@@ -276,6 +263,22 @@ async def download_file(request: Request):
         filename=filename,
         media_type=media_type
     )
+
+
+# Add a route to handle the placeholder image requests
+@app.get("/api/placeholder/{width}/{height}")
+async def placeholder_image(width: int, height: int):
+    # Create a simple placeholder SVG
+    svg_content = f"""
+    <svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100%" height="100%" fill="#e0e0e0" />
+        <text x="50%" y="50%" font-family="Arial" font-size="24" fill="#666666" 
+              text-anchor="middle" dominant-baseline="middle">
+            {width} x {height}
+        </text>
+    </svg>
+    """
+    return Response(content=svg_content, media_type="image/svg+xml")
 
 
 if __name__ == "__main__":
