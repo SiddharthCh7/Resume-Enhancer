@@ -184,6 +184,43 @@ def write_to_docx(text):
 
 @app.get("/", response_class=JSONResponse)
 async def index(request: Request):
+    resume_text = """Siddharth Chevella
+            Phagwara, Punjab 144001
+            +91-8074909647  siddharth070504@gmail.com  linkedin.com/in/siddharth-ch05/  github.com/SiddharthCh7/ 
+            Internship
+            Data Analyst Intern     June 2024 - Sep 2024
+            Futurense Technologies
+            Streamlined data collection and reporting procedures, reducing data gathering time by 30% through automation and improved processes, leading to faster decision-making
+            Collaborated with team members to gather requirements, define project scopes, and ensure alignment with business objectives, improving project delivery time and fostering effective teamwork and project success
+            Produced comprehensive reports and presentations summarizing findings and recommendations, leading to a 15% improvement in stakeholder decision-making speed and facilitating clear communication with key business stakeholders
+
+            Projects
+            Hate Speech Classification      Nov 2024 - Dec 2024
+            Achieved 83% accuracy in classifying text as Hate or Non-hate speech using a machine learning pipeline optimized for efficiency
+            Focused on enhancing data handling and model performance through techniques such as text preprocessing, batch processing, lazy evaluation, Hyperparameter tuning, and efficient memory management
+            Successfully applied Python, Polars, NLTK, Gensim, Scikit-learn, NumPy to build a robust model        
+            GitHub Repository Link: https://l1nq.com/0qLG0
+            US. pathway Analysis    June 2024 - Sep 2024
+                    Performed campaign data analysis on a U.S. pathway dataset, analyzing leads generated from LinkedIn, Google, and Facebook campaigns, resulting in a 25% improvement in lead conversion rate by identifying key trends and insights
+            Utilized Pandas for data manipulation, Matplotlib and Seaborn for data visualization, and Power BI for interactive reporting, reducing the time spent on reporting by 30% and enhancing the clarity of insights presented to stakeholders
+            Uncovered actionable trends that helped optimize future marketing strategies, improving campaign targeting by 20% and enhancing overall marketing effectiveness
+            Certificates
+            Dp - 900: Azure Data Fundamentals
+            Microsoft — Certificate Link
+            Technical Skills
+            Languages Python, Java, SQL
+            Technologies/Frameworks: PyTorch, Scikit-learn, Pandas, NumPy, Polars, Hugging Face
+            Machine Learning: Supervised, Classification, Regression, Neural Networks, NLP, LLMs
+            Tools: Jupyter, Cloud Platforms (Azure), SQL Databases
+            Soft Skills: Problem Solving, Communication, Teamwork, Time Management
+            Education
+            Lovely Professional University Punjab   2022 – 2026
+            Computer Science and Engineering — CGPA: 7.5    Jalandhar, Punjab
+            L.F. Junior College     2021 – 2022
+            12th with Science — Percentage: 85%             Hyderabad, Telangana
+            Narayana High School    2019 – 2020
+            10th with Science — CGPA: 10                    Hyderabad, Telangana
+"""
     system_prompt = """You are a professional resume enhancement expert. 
             Your task is to improve the provided resume text while COMPLETELY PRESERVING ALL of the original content and sections.
 
