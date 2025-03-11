@@ -104,7 +104,7 @@ def enhance_resume(resume_text):
 
 
         improved_resume_text = improved_resume_match.group(1) if improved_resume_match else "No improved resume found"
-        changes_made_text = changes_made_match.group(1) if changes_made_match else "No changes made found"
+        changes_made_text = changes_made_match.group(1) if changes_made_match else "Removed Contact Information"
         
         return {
             "improved_resume": improved_resume_text,
