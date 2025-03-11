@@ -182,7 +182,25 @@ def write_to_docx(text):
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     # return templates.TemplateResponse("index_flask.html", {"request": request})
-    return os.getenv('OPENROUTER_API_KEY')
+    payload = {
+            "model": "deepseek/deepseek-r1:free",
+            "messages": [
+                {"role": "system", "content": "You are an AI model"},
+                {"role": "user", "content": "What is your name?"}
+            ]
+        }
+    headers = {
+    "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}", 
+    "Content-Type": "application/json"
+    }
+    response = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions", 
+        headers=headers, 
+        data=json.dumps(payload)
+    )
+
+    result = response.json()["choices"][0]["message"]["content"]
+    return result
 
 
 @app.post("/upload")
