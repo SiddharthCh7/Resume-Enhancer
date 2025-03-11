@@ -2,7 +2,7 @@ import os, requests, json
 import tempfile
 import re
 from fastapi import FastAPI, File, UploadFile, Form, Request, Response
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
@@ -179,28 +179,9 @@ def write_to_docx(text):
     return docx_path
 
 
-@app.get("/", response_class=JSONResponse)
+@app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    # return templates.TemplateResponse("index_flask.html", {"request": request})
-    payload = {
-            "model": "deepseek/deepseek-r1:free",
-            "messages": [
-                {"role": "system", "content": "You are an AI model"},
-                {"role": "user", "content": "What is your name?"}
-            ]
-        }
-    headers = {
-    "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}", 
-    "Content-Type": "application/json"
-    }
-    response = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions", 
-        headers=headers, 
-        data=json.dumps(payload)
-    )
-
-    result = response.json()
-    return JSONResponse(content=result)
+    return templates.TemplateResponse("index_flask.html", {"request": request})
 
 
 @app.post("/upload")
