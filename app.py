@@ -268,7 +268,11 @@ async def index(request: Request):
     improved_resume_match = re.search(r"<IMPROVED_RESUME>\s*(.*?)\s*</IMPROVED_RESUME>", result, re.DOTALL)
     changes_made_match = re.search(r"<CHANGES_MADE>\s*(.*?)\s*</CHANGES_MADE>", result, re.DOTALL)
 
-    return JSONResponse(changes_made_match), JSONResponse(improved_resume_match)
+    improved_resume_text = improved_resume_match.group(1) if improved_resume_match else "No improved resume found"
+    changes_made_text = changes_made_match.group(1) if changes_made_match else "No changes made found"
+
+    # Return as JSON
+    return JSONResponse(content={"improved_resume": improved_resume_text, "changes_made": changes_made_text})
 
 
 @app.post("/upload")
