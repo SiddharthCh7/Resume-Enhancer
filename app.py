@@ -2,7 +2,7 @@ import os, requests, json
 import tempfile
 import re
 from fastapi import FastAPI, File, UploadFile, Form, Request, Response
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
@@ -13,7 +13,6 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 from dotenv import load_dotenv
-import uvicorn
 from pathlib import Path
 load_dotenv()
 
@@ -179,9 +178,57 @@ def write_to_docx(text):
     return docx_path
 
 
-@app.get("/", response_class=HTMLResponse)
+# @app.get("/", response_class=HTMLResponse)
+# async def index(request: Request):
+#     return templates.TemplateResponse("index_flask.html", {"request": request})
+
+@app.get("/", response_class=JSONResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index_flask.html", {"request": request})
+    system_prompt = """You are a professional resume enhancement expert. 
+            Your task is to improve the provided resume text while COMPLETELY PRESERVING ALL of the original content and sections.
+
+            What You Should Do:
+            Improve readability, conciseness, and clarity without changing the meaning.
+            Make the writing more polished and professional while keeping it natural.
+            
+            What You Should NOT Do:
+            Don't add anything new—not even for credibility.
+            Don't change the order, structure, or formatting in any way.
+            Don't remove anything, even if it seems unnecessary.
+            Don't rewrite sentences in a way that alters the original intent.
+            Your goal is to make the resume sound crisp, clear, and professional—without changing what's actually being said. Stick to the original content and just refine the language.
+
+            Format your response with two clearly marked sections:
+            <IMPROVED_RESUME>
+            [The complete improved resume text with EVERY SINGLE element from the original preserved]
+            </IMPROVED_RESUME>
+            
+            <CHANGES_MADE>
+            [Bulleted list of specific language improvements made]
+            </CHANGES_MADE>
+            """
+
+    user_message = f"Here is my resume text to enhance. You MUST keep ALL sections, ALL projects, and ALL technical skills:\n\n{resume_text}"
+
+    payload = {
+        "model": "deepseek/deepseek-r1:free",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message}
+        ]
+    }
+    headers = {
+    "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}", 
+    "Content-Type": "application/json"
+    }
+    response = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions", 
+        headers=headers, 
+        data=json.dumps(payload)
+    )
+
+    result = response.json()["choices"][0]["message"]["content"]
+    return JSONResponse(result)
 
 
 @app.post("/upload")
