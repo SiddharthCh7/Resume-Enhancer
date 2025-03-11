@@ -18,14 +18,18 @@ load_dotenv()
 
 
 app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key="resume_enhancer_secret_key")
+app.add_middleware(
+    SessionMiddleware,
+    secret_key="resume_enhancer_secret_key",
+)
 
 # Set up templates directory
 templates_directory = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(templates_directory))
 
 # Create a temporary folder for file uploads
-UPLOAD_FOLDER = tempfile.mkdtemp()
+UPLOAD_FOLDER = "/tmp/resume_uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 def extract_text_from_pdf(pdf_path):
@@ -102,6 +106,11 @@ def enhance_resume(resume_text):
         improved_resume_match = re.search(r"<IMPROVED_RESUME>\s*(.*?)\s*</IMPROVED_RESUME>", result, re.DOTALL)
         changes_made_match = re.search(r"<CHANGES_MADE>\s*(.*?)\s*</CHANGES_MADE>", result, re.DOTALL)
 
+        if not improved_resume_match:
+            print("⚠️ WARNING: <IMPROVED_RESUME> NOT FOUND IN RESPONSE!")
+
+        if not changes_made_match:
+            print("⚠️ WARNING: <CHANGES_MADE> NOT FOUND IN RESPONSE!")
 
         improved_resume_text = improved_resume_match.group(1) if improved_resume_match else "No improved resume found"
         changes_made_text = changes_made_match.group(1) if changes_made_match else "Removed Contact Information"
