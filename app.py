@@ -181,7 +181,8 @@ def write_to_docx(text):
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index_flask.html", {"request": request})
+    # return templates.TemplateResponse("index_flask.html", {"request": request})
+    return os.getenv('OPENROUTER_API_KEY')
 
 
 @app.post("/upload")
