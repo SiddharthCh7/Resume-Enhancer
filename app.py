@@ -214,11 +214,11 @@ async def index(request: Request):
             Tools: Jupyter, Cloud Platforms (Azure), SQL Databases
             Soft Skills: Problem Solving, Communication, Teamwork, Time Management
             Education
-            Lovely Professional University Punjab   2022 – 2026
+            Lovely Professional University Punjab   2022 - 2026
             Computer Science and Engineering — CGPA: 7.5    Jalandhar, Punjab
-            L.F. Junior College     2021 – 2022
+            L.F. Junior College     2021 - 2022
             12th with Science — Percentage: 85%             Hyderabad, Telangana
-            Narayana High School    2019 – 2020
+            Narayana High School    2019 - 2020
             10th with Science — CGPA: 10                    Hyderabad, Telangana
 """
     system_prompt = """You are a professional resume enhancement expert. 
@@ -265,7 +265,10 @@ async def index(request: Request):
     )
 
     result = response.json()["choices"][0]["message"]["content"]
-    return JSONResponse(result)
+    improved_resume_match = re.search(r"<IMPROVED_RESUME>\s*(.*?)\s*</IMPROVED_RESUME>", result, re.DOTALL)
+    changes_made_match = re.search(r"<CHANGES_MADE>\s*(.*?)\s*</CHANGES_MADE>", result, re.DOTALL)
+
+    return JSONResponse(changes_made_match), JSONResponse(improved_resume_match)
 
 
 @app.post("/upload")
