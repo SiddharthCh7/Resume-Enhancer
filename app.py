@@ -199,7 +199,7 @@ async def index(request: Request):
         data=json.dumps(payload)
     )
 
-    result = response.json()["choices"][0]["message"]["content"]
+    result = response.json()
     return result
 
 
