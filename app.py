@@ -1,7 +1,11 @@
 import os, requests, json
 import tempfile
 import re
-from flask import Flask, render_template, request, send_file, redirect, url_for, session
+from fastapi import FastAPI, File, UploadFile, Form, Request, Response
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 import fitz
 from docx import Document
 from reportlab.lib.pagesizes import letter
@@ -9,13 +13,18 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 from dotenv import load_dotenv
+import uvicorn
 load_dotenv()
 
 
+app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key="resume_enhancer_secret_key")
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
-app = Flask(__name__)
-app.secret_key = 'resume_enhancer_secret_key'
-app.config['UPLOAD_FOLDER'] = tempfile.mkdtemp()
+# Create a temporary folder for file uploads
+UPLOAD_FOLDER = tempfile.mkdtemp()
+
 
 def extract_text_from_pdf(pdf_path):
     text = ""
@@ -106,13 +115,10 @@ def enhance_resume(resume_text):
             "error": True,
             "message": f"Error: {str(e)}"
         }
- 
-
 
 
 def write_to_pdf(text):
-    
-    pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], "enhanced_resume.pdf")
+    pdf_path = os.path.join(UPLOAD_FOLDER, "enhanced_resume.pdf")
     doc = SimpleDocTemplate(
         pdf_path,
         pagesize=letter,
@@ -166,12 +172,10 @@ def write_to_pdf(text):
     return pdf_path
 
 
-
-
 def write_to_docx(text):
     print("well: ")
     print(text)
-    docx_path = os.path.join(app.config['UPLOAD_FOLDER'], "enhanced_resume.docx")
+    docx_path = os.path.join(UPLOAD_FOLDER, "enhanced_resume.docx")
     doc = Document()
     for line in text.split("\n"):
         doc.add_paragraph(line)
@@ -187,56 +191,52 @@ def write_to_docx(text):
     return docx_path
 
 
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse("index_flask.html", {"request": request})
 
 
-
-
-@app.route('/')
-def index():
-    return render_template('index_flask.html')
-
-
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    if 'resume' not in request.files:
-        return redirect(url_for('index'))
+@app.post("/upload")
+async def upload_file(request: Request, resume: UploadFile = File(...), format: str = Form("pdf")):
+    file_path = os.path.join(UPLOAD_FOLDER, resume.filename)
     
-    file = request.files['resume']
-    output_format = request.form.get('format', 'pdf')
+    # Save the uploaded file
+    with open(file_path, "wb") as buffer:
+        content = await resume.read()
+        buffer.write(content)
     
-    if file.filename == '':
-        return redirect(url_for('index'))
-
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-    file.save(file_path)
-    
-    if file.filename.endswith('.pdf'):
+    # Extract text based on file type
+    if resume.filename.endswith('.pdf'):
         resume_text = extract_text_from_pdf(file_path)
         original_format = 'pdf'
-    elif file.filename.endswith('.docx'):
+    elif resume.filename.endswith('.docx'):
         resume_text = extract_text_from_docx(file_path)
         original_format = 'docx'
     else:
-        return "Unsupported file format. Please upload a PDF or DOCX file."
+        return HTMLResponse("Unsupported file format. Please upload a PDF or DOCX file.")
+    
     if not resume_text:
-        return "Failed to extract text from the uploaded file."
+        return HTMLResponse("Failed to extract text from the uploaded file.")
     
+    # Enhance the resume
     enhancement_result = enhance_resume(resume_text)
-    print(enhancement_result)
-    session['improved_resume'] = enhancement_result.get('improved_resume')
-    session['changes_made'] = enhancement_result.get('changes_made')
-    session['output_format'] = output_format
-    session['original_format'] = original_format
     
-    return redirect(url_for('show_results'))
+    # Store data in session
+    request.session["improved_resume"] = enhancement_result.get('improved_resume')
+    request.session["changes_made"] = enhancement_result.get('changes_made')
+    request.session["output_format"] = format
+    request.session["original_format"] = original_format
+    
+    return RedirectResponse(url="/results", status_code=303)
 
 
-@app.route('/results')
-def show_results():
-    if 'improved_resume' not in session:
-        return redirect(url_for('index'))
+@app.get("/results", response_class=HTMLResponse)
+async def show_results(request: Request):
+    if "improved_resume" not in request.session:
+        return RedirectResponse(url="/", status_code=303)
     
-    changes_made = session.get('changes_made')
+    changes_made = request.session.get("changes_made", "")
+    print(changes_made)
     formatted_changes = ""
     for line in changes_made.split('\n'):
         if line.strip():
@@ -245,32 +245,38 @@ def show_results():
             else:
                 formatted_changes += f"<li>{line.strip()}</li>"
     
-    return render_template('results_flask.html', 
-                          changes_made=formatted_changes)
+    return templates.TemplateResponse(
+        "results_flask.html", 
+        {"request": request, "changes_made": formatted_changes}
+    )
 
 
-@app.route('/download')
-def download_file():
-    if 'improved_resume' not in session:
-        return redirect(url_for('index'))
+@app.get("/download")
+async def download_file(request: Request):
+    if "improved_resume" not in request.session:
+        return RedirectResponse(url="/", status_code=303)
     
-    improved_resume = session.get('improved_resume')
-    output_format = session.get('output_format', 'pdf')
+    improved_resume = request.session.get("improved_resume")
+    output_format = request.session.get("output_format", "pdf")
 
     if output_format == 'docx':
         output_path = write_to_docx(improved_resume)
-        mime_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         filename = "enhanced_resume.docx"
+        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     else:
-        output_path = write_to_pdf(improved_resume, )
-        mime_type = 'application/pdf'
+        output_path = write_to_pdf(improved_resume)
         filename = "enhanced_resume.pdf"
-    if not os.path.exists(output_path) or not os.access(output_path, os.R_OK):
-        return "Error: Could not generate the file. Please try again."
+        media_type = "application/pdf"
     
-    return send_file(output_path, as_attachment=True, 
-                    download_name=filename, mimetype=mime_type)
+    if not os.path.exists(output_path) or not os.access(output_path, os.R_OK):
+        return HTMLResponse("Error: Could not generate the file. Please try again.")
+    
+    return FileResponse(
+        path=output_path,
+        filename=filename,
+        media_type=media_type
+    )
 
 
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
