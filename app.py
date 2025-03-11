@@ -310,8 +310,12 @@ async def upload_file(request: Request, resume: UploadFile = File(...), format: 
     enhancement_result = enhance_resume(resume_text)
     
     # Store data in session
-    request.session["improved_resume"] = enhancement_result.get('improved_resume')
-    request.session["changes_made"] = enhancement_result.get('changes_made')
+    improved_resume = enhancement_result.get('improved_resume')
+    changes_made = enhancement_result.get('changes_made')
+
+    request.session["improved_resume"] = improved_resume
+    request.session["changes_made"] = changes_made
+
     request.session["output_format"] = format
     request.session["original_format"] = original_format
     
@@ -324,6 +328,8 @@ async def show_results(request: Request):
         return RedirectResponse(url="/", status_code=303)
     
     changes_made = request.session.get("changes_made", "")
+    if changes_made == "":
+        return HTMLResponse(content="changes_made is not in session")
     formatted_changes = ""
     for line in changes_made.split('\n'):
         if line.strip():
