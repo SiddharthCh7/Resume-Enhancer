@@ -226,8 +226,8 @@ def upload_file():
     
     enhancement_result = enhance_resume(resume_text)
     print(enhancement_result)
-    session['improved_resume'] = enhancement_result['improved_resume']
-    session['changes_made'] = enhancement_result['changes_made']
+    session['improved_resume'] = enhancement_result.get('improved_resume')
+    session['changes_made'] = enhancement_result.get('changes_made')
     session['output_format'] = output_format
     session['original_format'] = original_format
     
