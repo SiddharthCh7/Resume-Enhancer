@@ -2,7 +2,7 @@ import os, requests, json
 import tempfile
 import re
 from fastapi import FastAPI, File, UploadFile, Form, Request, Response
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
@@ -179,7 +179,7 @@ def write_to_docx(text):
     return docx_path
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/", response_class=JSONResponse)
 async def index(request: Request):
     # return templates.TemplateResponse("index_flask.html", {"request": request})
     payload = {
@@ -200,7 +200,7 @@ async def index(request: Request):
     )
 
     result = response.json()
-    return result
+    return JSONResponse(content=result)
 
 
 @app.post("/upload")
