@@ -18,7 +18,7 @@ Follow these simple steps to set up and run the Resume Enhancer locally:
 
 ### 1️⃣ Clone the Repository
 ```sh
-git clone https://github.com/yourusername/resume-enhancer.git
+git clone https://github.com/SiddharthCh7/Resume-Enhancer.git
 cd resume-enhancer
 ```
 
