@@ -1,5 +1,4 @@
 import os, requests, json
-import tempfile
 import re
 from fastapi import FastAPI, File, UploadFile, Form, Request, Response
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse
@@ -328,7 +327,7 @@ async def show_results(request: Request):
         return RedirectResponse(url="/", status_code=303)
     
     changes_made = request.session.get("changes_made", "")
-    if changes_made == "":
+    if changes_made == "" or changes_made is None:
         return HTMLResponse(content="changes_made is not in session")
     formatted_changes = ""
     for line in changes_made.split('\n'):
