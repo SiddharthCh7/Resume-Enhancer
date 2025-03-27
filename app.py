@@ -320,9 +320,9 @@ async def upload_file(request: Request, resume: UploadFile = File(...), format: 
 
 @app.get("/results", response_class=HTMLResponse)
 async def show_results(request: Request):
-    print("In results",dict(request.state.session))
+    # print("In results",dict(request.state.session))
     if "improved_resume" not in request.state.session:
-        print("Improved resume not found")
+        # print("Improved resume not found")
         return RedirectResponse(url="/", status_code=303)
     
     changes_made = request.state.session.get("changes_made", "")
