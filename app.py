@@ -1,7 +1,7 @@
 import os, requests, json
 import re
 from fastapi import FastAPI, File, UploadFile, Form, Request, Response
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
@@ -11,16 +11,97 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
-from dotenv import load_dotenv
 from pathlib import Path
-load_dotenv()
-
 
 app = FastAPI()
-app.add_middleware(
-    SessionMiddleware,
-    secret_key="resume_enhancer_secret_key",
-)
+
+# Custom database-backed session implementation
+# pip install sqlalchemy redis
+
+from fastapi import FastAPI, Request, Response, Depends
+from starlette.middleware.base import BaseHTTPMiddleware
+from sqlalchemy import create_engine, Column, String, LargeBinary
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+import pickle
+import uuid
+import json
+from base64 import b64encode, b64decode
+
+# Database setup
+DATABASE_URL = "sqlite:///./sessions.db"
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+class SessionModel(Base):
+    __tablename__ = "sessions"
+    id = Column(String, primary_key=True)
+    data = Column(String)  # Store serialized session data
+
+Base.metadata.create_all(bind=engine)
+
+# Custom session middleware
+class CustomSessionMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        session_id = request.cookies.get("session_id")
+        
+        # Create a new session if one doesn't exist
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            request.state.session = {}
+            request.state.new_session = True
+        else:
+            # Load existing session from database
+            db = SessionLocal()
+            try:
+                db_session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+                if db_session:
+                    request.state.session = json.loads(db_session.data)
+                else:
+                    request.state.session = {}
+                    request.state.new_session = True
+            finally:
+                db.close()
+        
+        # Process the request
+        response = await call_next(request)
+        
+        # Save session to database
+        db = SessionLocal()
+        try:
+            session_data = json.dumps(request.state.session)
+            db_session = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+            if db_session:
+                db_session.data = session_data
+            else:
+                db_session = SessionModel(id=session_id, data=session_data)
+                db.add(db_session)
+            db.commit()
+        finally:
+            db.close()
+        
+        # Set session cookie if it's a new session
+        if getattr(request.state, "new_session", False):
+            response.set_cookie(
+                key="session_id",
+                value=session_id,
+                httponly=True,
+                max_age=3600,
+                samesite="lax"
+            )
+        
+        return response
+
+# Add the middleware to your app
+app.add_middleware(CustomSessionMiddleware)
+
+
+
+with open("config.json", "r") as f:
+    config = json.load(f)
+
+api_key = config["OPENROUTER_API_KEY"]
 
 # Set up templates directory
 templates_directory = Path(__file__).parent / "templates"
@@ -57,7 +138,9 @@ def extract_text_from_docx(docx_path):
 
 def enhance_resume(resume_text):
     try:
-        system_prompt = """You are a professional resume enhancement expert. 
+        system_prompt = {
+            "role" : "system",
+            "content": """You are a professional resume enhancement expert. 
             Your task is to improve the provided resume text while COMPLETELY PRESERVING ALL of the original content and sections.
 
             What You Should Do:
@@ -80,26 +163,26 @@ def enhance_resume(resume_text):
             [Bulleted list of specific language improvements made]
             </CHANGES_MADE>
             """
+        }
 
-        user_message = f"Here is my resume text to enhance. You MUST keep ALL sections, ALL projects, and ALL technical skills:\n\n{resume_text}"
-    
-        payload = {
-            "model": "deepseek/deepseek-r1:free",
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ]
+        user_message = {
+            "role" : "user",
+            "content": "Here is my resume text to enhance. You MUST keep ALL sections, ALL projects, and ALL technical skills:\n\n{}".format(resume_text)
         }
-        headers = {
-        "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}", 
-        "Content-Type": "application/json"
-        }
+        messages = [system_prompt, user_message]
         response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions", 
-            headers=headers, 
-            data=json.dumps(payload)
+            url="https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": "Bearer {}".format(api_key),
+                "Content-Type": "application/json",
+            },
+            
+            data=json.dumps({
+                "model": "deepseek/deepseek-r1:free",
+                "messages": messages,
+            })
         )
-    
+        # print("REsult:", response.json())
         result = response.json()["choices"][0]["message"]["content"]
         
         improved_resume_match = re.search(r"<IMPROVED_RESUME>\s*(.*?)\s*</IMPROVED_RESUME>", result, re.DOTALL)
@@ -114,6 +197,7 @@ def enhance_resume(resume_text):
         improved_resume_text = improved_resume_match.group(1) if improved_resume_match else "No improved resume found"
         changes_made_text = changes_made_match.group(1) if changes_made_match else "Removed Contact Information"
         
+        # print("changes_made_text",changes_made_text)
         return {
             "improved_resume": improved_resume_text,
             "changes_made": changes_made_text,
@@ -121,6 +205,7 @@ def enhance_resume(resume_text):
         }
         
     except Exception as e:
+        print(f"Exception:: {e}")
         return {
             "error": True,
             "message": f"Error: {str(e)}"
@@ -186,102 +271,11 @@ def write_to_docx(text):
     return docx_path
 
 
+
+# Routes
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse("index_flask.html", {"request": request})
-
-# @app.get("/", response_class=JSONResponse)
-# async def index(request: Request):
-#     resume_text = """Siddharth Chevella
-#             Phagwara, Punjab 144001
-#             +91-8074909647  siddharth070504@gmail.com  linkedin.com/in/siddharth-ch05/  github.com/SiddharthCh7/ 
-#             Internship
-#             Data Analyst Intern     June 2024 - Sep 2024
-#             Futurense Technologies
-#             Streamlined data collection and reporting procedures, reducing data gathering time by 30% through automation and improved processes, leading to faster decision-making
-#             Collaborated with team members to gather requirements, define project scopes, and ensure alignment with business objectives, improving project delivery time and fostering effective teamwork and project success
-#             Produced comprehensive reports and presentations summarizing findings and recommendations, leading to a 15% improvement in stakeholder decision-making speed and facilitating clear communication with key business stakeholders
-
-#             Projects
-#             Hate Speech Classification      Nov 2024 - Dec 2024
-#             Achieved 83% accuracy in classifying text as Hate or Non-hate speech using a machine learning pipeline optimized for efficiency
-#             Focused on enhancing data handling and model performance through techniques such as text preprocessing, batch processing, lazy evaluation, Hyperparameter tuning, and efficient memory management
-#             Successfully applied Python, Polars, NLTK, Gensim, Scikit-learn, NumPy to build a robust model        
-#             GitHub Repository Link: https://l1nq.com/0qLG0
-#             US. pathway Analysis    June 2024 - Sep 2024
-#                     Performed campaign data analysis on a U.S. pathway dataset, analyzing leads generated from LinkedIn, Google, and Facebook campaigns, resulting in a 25% improvement in lead conversion rate by identifying key trends and insights
-#             Utilized Pandas for data manipulation, Matplotlib and Seaborn for data visualization, and Power BI for interactive reporting, reducing the time spent on reporting by 30% and enhancing the clarity of insights presented to stakeholders
-#             Uncovered actionable trends that helped optimize future marketing strategies, improving campaign targeting by 20% and enhancing overall marketing effectiveness
-#             Certificates
-#             Dp - 900: Azure Data Fundamentals
-#             Microsoft — Certificate Link
-#             Technical Skills
-#             Languages Python, Java, SQL
-#             Technologies/Frameworks: PyTorch, Scikit-learn, Pandas, NumPy, Polars, Hugging Face
-#             Machine Learning: Supervised, Classification, Regression, Neural Networks, NLP, LLMs
-#             Tools: Jupyter, Cloud Platforms (Azure), SQL Databases
-#             Soft Skills: Problem Solving, Communication, Teamwork, Time Management
-#             Education
-#             Lovely Professional University Punjab   2022 - 2026
-#             Computer Science and Engineering — CGPA: 7.5    Jalandhar, Punjab
-#             L.F. Junior College     2021 - 2022
-#             12th with Science — Percentage: 85%             Hyderabad, Telangana
-#             Narayana High School    2019 - 2020
-#             10th with Science — CGPA: 10                    Hyderabad, Telangana
-# """
-#     system_prompt = """You are a professional resume enhancement expert. 
-#             Your task is to improve the provided resume text while COMPLETELY PRESERVING ALL of the original content and sections.
-
-#             What You Should Do:
-#             Improve readability, conciseness, and clarity without changing the meaning.
-#             Make the writing more polished and professional while keeping it natural.
-            
-#             What You Should NOT Do:
-#             Don't add anything new—not even for credibility.
-#             Don't change the order, structure, or formatting in any way.
-#             Don't remove anything, even if it seems unnecessary.
-#             Don't rewrite sentences in a way that alters the original intent.
-#             Your goal is to make the resume sound crisp, clear, and professional—without changing what's actually being said. Stick to the original content and just refine the language.
-
-#             Format your response with two clearly marked sections:
-#             <IMPROVED_RESUME>
-#             [The complete improved resume text with EVERY SINGLE element from the original preserved]
-#             </IMPROVED_RESUME>
-            
-#             <CHANGES_MADE>
-#             [Bulleted list of specific language improvements made]
-#             </CHANGES_MADE>
-#             """
-
-#     user_message = f"Here is my resume text to enhance. You MUST keep ALL sections, ALL projects, and ALL technical skills:\n\n{resume_text}"
-
-#     payload = {
-#         "model": "deepseek/deepseek-r1:free",
-#         "messages": [
-#             {"role": "system", "content": system_prompt},
-#             {"role": "user", "content": user_message}
-#         ]
-#     }
-#     headers = {
-#     "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}", 
-#     "Content-Type": "application/json"
-#     }
-#     response = requests.post(
-#         "https://openrouter.ai/api/v1/chat/completions", 
-#         headers=headers, 
-#         data=json.dumps(payload)
-#     )
-
-#     result = response.json()["choices"][0]["message"]["content"]
-#     improved_resume_match = re.search(r"<IMPROVED_RESUME>\s*(.*?)\s*</IMPROVED_RESUME>", result, re.DOTALL)
-#     changes_made_match = re.search(r"<CHANGES_MADE>\s*(.*?)\s*</CHANGES_MADE>", result, re.DOTALL)
-
-#     improved_resume_text = improved_resume_match.group(1) if improved_resume_match else "No improved resume found"
-#     changes_made_text = changes_made_match.group(1) if changes_made_match else "No changes made found"
-
-#     # Return as JSON
-#     return JSONResponse(content={"improved_resume": improved_resume_text, "changes_made": changes_made_text})
-
 
 @app.post("/upload")
 async def upload_file(request: Request, resume: UploadFile = File(...), format: str = Form("pdf")):
@@ -312,21 +306,26 @@ async def upload_file(request: Request, resume: UploadFile = File(...), format: 
     improved_resume = enhancement_result.get('improved_resume')
     changes_made = enhancement_result.get('changes_made')
 
-    request.session["improved_resume"] = improved_resume
-    request.session["changes_made"] = changes_made
+    request.state.session["improved_resume"] = improved_resume
+    request.state.session["changes_made"] = changes_made
 
-    request.session["output_format"] = format
-    request.session["original_format"] = original_format
-    
-    return RedirectResponse(url="/results", status_code=303)
+
+    request.state.session["output_format"] = format
+    request.state.session["original_format"] = original_format
+
+    # print("after storing",request.session)
+    response = RedirectResponse(url="/results", status_code=303)
+    return response
 
 
 @app.get("/results", response_class=HTMLResponse)
 async def show_results(request: Request):
-    if "improved_resume" not in request.session:
+    print("In results",dict(request.state.session))
+    if "improved_resume" not in request.state.session:
+        print("Improved resume not found")
         return RedirectResponse(url="/", status_code=303)
     
-    changes_made = request.session.get("changes_made", "")
+    changes_made = request.state.session.get("changes_made", "")
     if changes_made == "" or changes_made is None:
         return HTMLResponse(content="changes_made is not in session")
     formatted_changes = ""
@@ -345,11 +344,11 @@ async def show_results(request: Request):
 
 @app.get("/download")
 async def download_file(request: Request):
-    if "improved_resume" not in request.session:
+    if "improved_resume" not in request.state.session:
         return RedirectResponse(url="/", status_code=303)
     
-    improved_resume = request.session.get("improved_resume")
-    output_format = request.session.get("output_format", "pdf")
+    improved_resume = request.state.session.get("improved_resume")
+    output_format = request.state.session.get("output_format", "pdf")
 
     if output_format == 'docx':
         output_path = write_to_docx(improved_resume)
@@ -384,7 +383,3 @@ async def placeholder_image(width: int, height: int):
     </svg>
     """
     return Response(content=svg_content, media_type="image/svg+xml")
-
-
-# if __name__ == "__main__":
-#     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)

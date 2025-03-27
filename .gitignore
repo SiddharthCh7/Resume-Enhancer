@@ -1,9 +1,5 @@
 .env
-ca.py
-ca1.py
-functions.py
-main.py
-new.py
 __pycache__
 .gradio
 env
+config.json
