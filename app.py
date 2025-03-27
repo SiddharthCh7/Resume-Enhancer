@@ -12,11 +12,11 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 from pathlib import Path
+from dotenv import load_dotenv
 
+load_dotenv()
 app = FastAPI()
 
-# Custom database-backed session implementation
-# pip install sqlalchemy redis
 
 from fastapi import FastAPI, Request, Response, Depends
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -93,15 +93,15 @@ class CustomSessionMiddleware(BaseHTTPMiddleware):
         
         return response
 
-# Add the middleware to your app
 app.add_middleware(CustomSessionMiddleware)
 
 
 
-with open("config.json", "r") as f:
-    config = json.load(f)
+# with open("config.json", "r") as f:
+#     config = json.load(f)
 
-api_key = config["OPENROUTER_API_KEY"]
+# api_key = config["OPENROUTER_API_KEY"]
+api_key = os.getenv('OPENROUTER_API_KEY')
 
 # Set up templates directory
 templates_directory = Path(__file__).parent / "templates"
