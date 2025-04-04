@@ -1,32 +1,26 @@
-import os, requests, json
-import re
+import os, requests, json, uuid, re
+
 from fastapi import FastAPI, File, UploadFile, Form, Request, Response
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from starlette.middleware.sessions import SessionMiddleware
+
 import fitz
 from docx import Document
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
+
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
-app = FastAPI()
-
-
-from fastapi import FastAPI, Request, Response, Depends
 from starlette.middleware.base import BaseHTTPMiddleware
-from sqlalchemy import create_engine, Column, String, LargeBinary
+from sqlalchemy import create_engine, Column, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import pickle
-import uuid
-import json
-from base64 import b64encode, b64decode
+
+load_dotenv()
+app = FastAPI()
 
 # Database setup
 DATABASE_URL = "sqlite:///./sessions.db"
@@ -37,7 +31,7 @@ Base = declarative_base()
 class SessionModel(Base):
     __tablename__ = "sessions"
     id = Column(String, primary_key=True)
-    data = Column(String)  # Store serialized session data
+    data = Column(String)
 
 Base.metadata.create_all(bind=engine)
 
