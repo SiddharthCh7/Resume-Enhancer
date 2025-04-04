@@ -2,7 +2,8 @@
 
 🚀 Transform your resume into a polished, professional masterpiece with AI! This Resume Enhancer takes in a resume in **DOCX** or **PDF** format and returns an **enhanced** version in the user’s chosen format. 📝✨
 
-🌐 **Live**: <a href="https://resume-enhancer-w9yb.onrender.com/" target="_blank">https://resume-enhancer-w9yb.onrender.com/</a>
+🌐 **Live Demo**: [https://resume-enhancer-w9yb.onrender.com/](https://resume-enhancer-w9yb.onrender.com/)  
+
 
 ## 🎯 Features
 - ✅ **Corrects inconsistencies** in formatting and content  
