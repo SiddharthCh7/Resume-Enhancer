@@ -117,7 +117,6 @@ def extract_text_from_pdf(pdf_path):
         print(f"Error extracting text from PDF: {e}")
         return None
 
-
 def extract_text_from_docx(docx_path):
     try:
         doc = Document(docx_path)
